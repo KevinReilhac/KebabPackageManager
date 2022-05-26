@@ -1,0 +1,20 @@
+{
+  "name": "com.kebab.package_manager",
+  "version": "1.0.0",
+  "displayName": "KebabPackageManager",
+  "description": "Custom Package Manager to handle github packages dependencies",
+  "documentationUrl": "https://example.com/",
+  "changelogUrl": "https://example.com/changelog.html",
+  "licensesUrl": "https://example.com/licensing.html",
+  "keywords": [],
+  "author": {
+    "name": "Kévin \"Kebab\" Reilhac",
+    "email": "kevin.reilhac.pro@gmail.com",
+    "url": "https://www.unity3d.com"
+  },
+  "dependencies": {
+  },
+  "samples": [
+  ],
+  "hideInEditor": false
+}
