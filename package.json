@@ -1,6 +1,6 @@
 {
   "name": "com.kebab.package_manager",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "displayName": "KebabPackageManager",
   "description": "Custom Package Manager to handle github packages dependencies",
   "documentationUrl": "https://example.com/",
