@@ -30,7 +30,7 @@ namespace Kebab.PackageManager
 		private void OnEnable()
 		{
 			if (config == null)
-				UpdateConfig();
+				Refresh();
 		}
 
 		private void OnGUI()
@@ -52,7 +52,7 @@ namespace Kebab.PackageManager
 			}
 
 			if (GUILayout.Button(EditorGUIUtility.IconContent("Refresh")))
-				UpdateConfig();
+				Refresh();
 			scrollValue = GUILayout.BeginScrollView(scrollValue);
 			foreach (KPMModule module in config.modules)
 			{
@@ -138,20 +138,24 @@ namespace Kebab.PackageManager
 			List<string> packagesToUninstall = new List<string>();
 
 			packagesToUninstall.Add(packageId);
-			if (
-					dependsOn.Count > 0 &&
-					EditorUtility.DisplayDialog(
+			if (dependsOn.Count > 0)
+			{
+				if (EditorUtility.DisplayDialog(
 						"Uninstall package",
 						string.Format("Some packages ({0}) depends on {1} ",
-						string.Join(',', dependsOn), packageId),
+						string.Join(", ", dependsOn), packageId),
 						"yes",
 						"no"
 					)
 				)
-			{
-				packagesToUninstall.AddRange(dependsOn);
+				{
+					packagesToUninstall.AddRange(dependsOn);
+				}
+				else
+				{
+					return;
+				}
 			}
-
 			packagesAddRemoveRequest = Client.AddAndRemove(packagesToRemove: packagesToUninstall.ToArray());
 			EditorApplication.update += AddAndRemoveRequestUpdate;
 		}
@@ -169,8 +173,10 @@ namespace Kebab.PackageManager
 				}
 			}
 
+			List<string> recursiveDependencies = new List<string>();
 			foreach (string dependsPackage in dependsOn)
-				dependsOn.AddRange(GetPackagesDependsOn(dependsPackage));
+				recursiveDependencies.AddRange(GetPackagesDependsOn(dependsPackage));
+			dependsOn.AddRange(recursiveDependencies);
 
 			return (dependsOn);
 		}
@@ -184,6 +190,7 @@ namespace Kebab.PackageManager
 				if (packagesAddRemoveRequest.Status == StatusCode.Success)
 				{
 					Debug.Log("Success");
+					Refresh();
 				}
 				else if (packagesAddRemoveRequest.Status >= StatusCode.Failure)
 					Debug.LogError(packagesListRequest.Error.message);
@@ -192,7 +199,7 @@ namespace Kebab.PackageManager
 			}
 		}
 
-		private async void UpdateConfig()
+		private async void Refresh()
 		{
 			config = null;
 			installedPackages = null;
