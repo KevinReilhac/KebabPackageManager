@@ -14,7 +14,7 @@ namespace Kebab.PackageManager
 	{
 		private static KPMConfig config = null;
 		private static Vector2 scrollValue = Vector2.zero;
-		private static List<string> installedPackages = null;
+		private static Dictionary<string, UnityEditor.PackageManager.PackageInfo> installedPackages = null;
 
 		private static ListRequest packagesListRequest = null;
 		private static AddAndRemoveRequest packagesAddRemoveRequest = null;
@@ -45,6 +45,12 @@ namespace Kebab.PackageManager
 				GUILayout.Label("Loading config files...");
 				return;
 			}
+			if (installedPackages == null)
+			{
+				GUILayout.Label("Refresh package list");
+				return;
+			}
+
 			if (GUILayout.Button(EditorGUIUtility.IconContent("Refresh")))
 				UpdateConfig();
 			scrollValue = GUILayout.BeginScrollView(scrollValue);
@@ -82,7 +88,7 @@ namespace Kebab.PackageManager
 		{
 			if (installedPackages == null)
 				return (false);
-			return (installedPackages.Contains(module.package_id));
+			return (installedPackages.ContainsKey(module.package_id));
 		}
 
 		private void InstallPackage(KPMModule module)
@@ -123,25 +129,50 @@ namespace Kebab.PackageManager
 		{
 			List<string> packagesIds = new List<string>();
 
-			packagesIds.Add(module.package_id);
+			UninstallPackage(module.package_id);
+		}
 
-			if (EditorUtility.DisplayDialog("Uninstall module", "Uninstall dependencies too ?", "yes", "no"))
+		private void UninstallPackage(string packageId)
+		{
+			List<string> dependsOn = GetPackagesDependsOn(packageId);
+			List<string> packagesToUninstall = new List<string>();
+
+			packagesToUninstall.Add(packageId);
+			if (
+					dependsOn.Count > 0 &&
+					EditorUtility.DisplayDialog(
+						"Uninstall package",
+						string.Format("Some packages ({0}) depends on {1} ",
+						string.Join(',', dependsOn), packageId),
+						"yes",
+						"no"
+					)
+				)
 			{
-				List<string> dependenciesName = GetAllDependencies(module);
-				List<string> dependenciesPackageNames = new List<string>();
-
-				foreach (string dependencyName in dependenciesName)
-				{
-					KPMModule dependencyModule = config.modules.Find((m) => m.name == dependencyName);
-
-					dependenciesPackageNames.Add(dependencyModule.package_id);
-				}
-
-				packagesIds.AddRange(dependenciesPackageNames);
+				packagesToUninstall.AddRange(dependsOn);
 			}
 
-			packagesAddRemoveRequest = Client.AddAndRemove(packagesToRemove: packagesIds.ToArray());
+			packagesAddRemoveRequest = Client.AddAndRemove(packagesToRemove: packagesToUninstall.ToArray());
 			EditorApplication.update += AddAndRemoveRequestUpdate;
+		}
+
+		private List<string> GetPackagesDependsOn(string packageId)
+		{
+			List<string> dependsOn = new List<string>();
+
+			foreach (var item in installedPackages)
+			{
+				foreach (DependencyInfo dependencyInfo in item.Value.dependencies)
+				{
+					if (dependencyInfo.name == packageId)
+						dependsOn.Add(item.Key);
+				}
+			}
+
+			foreach (string dependsPackage in dependsOn)
+				dependsOn.AddRange(GetPackagesDependsOn(dependsPackage));
+
+			return (dependsOn);
 		}
 
 		private void AddAndRemoveRequestUpdate()
@@ -164,6 +195,7 @@ namespace Kebab.PackageManager
 		private async void UpdateConfig()
 		{
 			config = null;
+			installedPackages = null;
 
 			GetPackageList();
 			config = await KPMConfigReader.GetConfig();
@@ -183,7 +215,14 @@ namespace Kebab.PackageManager
 			if (packagesListRequest.IsCompleted)
 			{
 				if (packagesListRequest.Status == StatusCode.Success)
-					installedPackages = packagesListRequest.Result.Select((p) => p.packageId.Split("@")[0]).ToList();
+				{
+					installedPackages = new Dictionary<string, UnityEditor.PackageManager.PackageInfo>();
+					foreach (UnityEditor.PackageManager.PackageInfo package in packagesListRequest.Result)
+					{
+						string key = package.packageId.Split('@')[0];
+						installedPackages.Add(key, package);
+					}
+				}
 				else if (packagesListRequest.Status >= StatusCode.Failure)
 					Debug.Log(packagesListRequest.Error.message);
 
